@@ -52,7 +52,6 @@ bool q_insert_head(struct list_head *head, char *s)
     strncpy(new->value, s, length);
     new->value[length] = '\0';
     list_add(&new->list, head);
-
     return true;
 }
 
@@ -81,10 +80,9 @@ bool q_insert_tail(struct list_head *head, char *s)
 /* Remove an element from head of queue */
 element_t *q_remove_head(struct list_head *head, char *sp, size_t bufsize)
 {
-    if (!head)
+    if (!head || !sp || list_empty(head))
         return NULL;
-    if (!sp)
-        return NULL;
+
 
     element_t *first_entry = list_first_entry(head, element_t, list);
     strncpy(sp, first_entry->value, bufsize - 1);
@@ -153,15 +151,23 @@ bool q_delete_dup(struct list_head *head)
 void q_swap(struct list_head *head)
 {
     // https://leetcode.com/problems/swap-nodes-in-pairs/
-    for (struct list_head *node = head->next; node->next != head;
-         node = node->next) {
+    for (struct list_head *node = head->next;
+         node->next != head && node != head; node = node->next) {
         list_del(node);
         list_add(node, node->next);
     }
 }
 
 /* Reverse elements in queue */
-void q_reverse(struct list_head *head) {}
+void q_reverse(struct list_head *head)
+{
+    if (!head || list_is_singular(head))
+        return;
+
+    struct list_head *node, *safe;
+    list_for_each_safe (node, safe, head)
+        list_move(node, head);
+}
 
 /* Reverse the nodes of the list k at a time */
 void q_reverseK(struct list_head *head, int k)
@@ -211,6 +217,7 @@ struct list_head *merge_sort(struct list_head *head)
         slow = slow->next;
     }
     slow->prev->next = NULL;
+    slow->prev = NULL;
     struct list_head *list1 = merge_sort(head);
     struct list_head *list2 = merge_sort(slow);
 
@@ -219,6 +226,8 @@ struct list_head *merge_sort(struct list_head *head)
 /* Sort elements of queue in ascending order */
 void q_sort(struct list_head *head)
 {
+    if (list_empty(head))
+        return;
     // break the list circle
     head->prev->next = NULL;
     head->prev = NULL;
@@ -228,8 +237,10 @@ void q_sort(struct list_head *head)
     head->next->prev = head;
     struct list_head *t = head;
     while (t->next != NULL) {
+        t->next->prev = t;
         t = t->next;
     }
+
     head->prev = t;
     t->next = head;
 }
@@ -245,6 +256,19 @@ int q_descend(struct list_head *head)
 /* Merge all the queues into one sorted queue, which is in ascending order */
 int q_merge(struct list_head *head)
 {
+    if (!head || list_empty(head))
+        return 0;
+
+    queue_contex_t *headchain = list_entry(head->next, queue_contex_t, chain);
+    if (list_is_singular(headchain->q))
+        return headchain->size;
+
+    for (struct list_head *h = head->next->next; h != head; h = h->next) {
+        queue_contex_t *qctx = list_entry(h, queue_contex_t, chain);
+        headchain->size += qctx->size;
+        list_splice_tail_init(qctx->q, headchain->q);
+    }
+    q_sort(headchain->q);
+    return headchain->size;
     // https://leetcode.com/problems/merge-k-sorted-lists/
-    return 0;
 }
